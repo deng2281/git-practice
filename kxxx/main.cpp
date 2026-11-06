@@ -1,10 +1,11 @@
 // File: main.cpp
 // Creator: Not specified.
 // Created: 2026-11-06
-// Description: Independent console tests for the first STL exercise stage.
+// Description: Independent console tests for KVector and KList.
 // Copyright: Not specified.
 
 #include "kvector.h"
+#include "klist.h"
 
 #include <cstdlib>
 #include <exception>
@@ -308,6 +309,293 @@ bool TestIndependentInstancesAndLifetime()
 	return ExpectEqual(persistentValues.size(), 1, "other destructors do not change persistent instance");
 }
 
+bool ExpectListSequence(const KList &values, const int *expectedValues, int expectedCount)
+{
+	if (!ExpectEqual(values.size(), expectedCount, "list size matches expected sequence"))
+		return false;
+
+	KList::ConstIterator iterator = values.begin();
+	for (int index = 0; index < expectedCount; ++index)
+	{
+		if (!Expect(iterator != values.end(), "list has the expected node")
+			|| !ExpectEqual(*iterator, expectedValues[index], "list element order"))
+			return false;
+		++iterator;
+	}
+
+	return Expect(iterator == values.end(), "list has no extra nodes");
+}
+
+bool TestListInitialState()
+{
+	KList values;
+	const KList &constantValues = values;
+	const KList::Iterator defaultIterator;
+	const KList::ConstIterator defaultConstIterator;
+	return Expect(values.empty(), "new list is empty")
+		&& ExpectEqual(values.size(), 0, "initial list size")
+		&& Expect(values.begin() == values.end(), "empty list iterator range")
+		&& Expect(constantValues.begin() == constantValues.end(), "empty list const range")
+		&& Expect(defaultIterator == values.end(), "default iterator is null")
+		&& Expect(defaultConstIterator == constantValues.end(), "default const iterator is null");
+}
+
+bool TestListHeadInsertion()
+{
+	KList values;
+	const int insertedValues[] = {10, -3, 0, 10};
+	for (int value : insertedValues)
+		values.push_front(value);
+
+	const int expectedValues[] = {10, 0, -3, 10};
+	return Expect(!values.empty(), "inserted list is not empty")
+		&& ExpectListSequence(values, expectedValues, 4);
+}
+
+bool TestListHeadRemoval()
+{
+	KList values;
+	values.push_front(10);
+	values.push_front(20);
+	values.push_front(30);
+	values.pop_front();
+	const int remainingValues[] = {20, 10};
+	if (!ExpectListSequence(values, remainingValues, 2))
+		return false;
+
+	values.pop_front();
+	const int lastValue[] = {10};
+	return ExpectListSequence(values, lastValue, 1);
+}
+
+bool TestListEmptyRemovalAndReuse()
+{
+	KList values;
+	values.pop_front();
+	values.pop_front();
+	if (!Expect(values.empty(), "empty removal has no effect")
+		|| !ExpectEqual(values.size(), 0, "empty removal keeps size zero"))
+		return false;
+
+	values.push_front(42);
+	if (!ExpectEqual(*values.begin(), 42, "single inserted node"))
+		return false;
+	values.pop_front();
+	if (!Expect(values.begin() == values.end(), "single node removed completely"))
+		return false;
+
+	values.pop_front();
+	values.push_front(-8);
+	const int expectedValues[] = {-8};
+	return ExpectListSequence(values, expectedValues, 1);
+}
+
+bool TestListMutableTraversal()
+{
+	KList values;
+	values.push_front(1);
+	values.push_front(2);
+	values.push_front(3);
+	for (int &value : values)
+		value *= 10;
+
+	KList::Iterator iterator = values.begin();
+	*iterator = 99;
+	const int expectedValues[] = {99, 20, 10};
+	return Expect(iterator.operator->() == &(*iterator), "arrow exposes the same element")
+		&& ExpectListSequence(values, expectedValues, 3);
+}
+
+bool TestListIteratorIncrementAndCopies()
+{
+	KList values;
+	values.push_front(10);
+	values.push_front(20);
+	values.push_front(30);
+	KList::Iterator iterator = values.begin();
+	KList::Iterator copy = iterator;
+	KList::Iterator previous = iterator++;
+	if (!Expect(previous == copy, "post-increment returns the old position")
+		|| !ExpectEqual(*previous, 30, "old position remains readable")
+		|| !ExpectEqual(*iterator, 20, "post-increment advances once")
+		|| !Expect(iterator != copy, "advancing a copy does not advance the original"))
+		return false;
+
+	KList::Iterator &advanced = ++iterator;
+	if (!Expect(&advanced == &iterator, "prefix increment returns this iterator")
+		|| !ExpectEqual(*iterator, 10, "prefix increment advances once"))
+		return false;
+
+	++iterator;
+	return Expect(iterator == values.end(), "increment from last node reaches end")
+		&& ExpectEqual(*copy, 30, "copied iterator has an independent position");
+}
+
+bool TestListConstTraversal()
+{
+	KList values;
+	values.push_front(1);
+	values.push_front(2);
+	values.push_front(3);
+	const KList &constantValues = values;
+	KList::ConstIterator iterator = constantValues.begin();
+	KList::ConstIterator previous = iterator++;
+	if (!ExpectEqual(*previous, 3, "const postfix increment returns old value")
+		|| !ExpectEqual(*iterator, 2, "const iterator advances")
+		|| !Expect(iterator.operator->() == &(*iterator), "const arrow points at the element"))
+		return false;
+
+	KList::ConstIterator converted = values.begin();
+	if (!Expect(converted == constantValues.begin(), "mutable iterator converts to const iterator")
+		|| !Expect(converted != iterator, "const iterator comparison"))
+		return false;
+
+	int total = 0;
+	int visitedCount = 0;
+	for (int value : constantValues)
+	{
+		total += value;
+		++visitedCount;
+	}
+
+	return ExpectEqual(total, 6, "const traversal sum")
+		&& ExpectEqual(visitedCount, 3, "const traversal count")
+		&& Expect(std::distance(constantValues.begin(), constantValues.end()) == 3,
+			"iterator traits support a standard traversal algorithm");
+}
+
+bool TestListInsertionPreservesIterators()
+{
+	KList values;
+	values.push_front(10);
+	KList::Iterator existingNode = values.begin();
+	int *existingValue = &(*existingNode);
+	values.push_front(20);
+	KList::Iterator nextNode = values.begin();
+	++nextNode;
+
+	return ExpectEqual(*existingNode, 10, "head insertion preserves existing node")
+		&& Expect(&(*existingNode) == existingValue, "head insertion preserves node address")
+		&& Expect(nextNode == existingNode, "new head links to the previous head")
+		&& ExpectEqual(values.size(), 2, "size after inserting a new head");
+}
+
+bool TestListRemovalPreservesSurvivingIterators()
+{
+	KList values;
+	values.push_front(10);
+	values.push_front(20);
+	values.push_front(30);
+	KList::Iterator survivingNode = values.begin();
+	++survivingNode;
+	int *survivingValue = &(*survivingNode);
+	values.pop_front();
+
+	// The erased head's iterator must not be dereferenced.
+	return Expect(values.begin() == survivingNode, "surviving node becomes the new head")
+		&& Expect(&(*survivingNode) == survivingValue, "surviving node address is unchanged")
+		&& ExpectEqual(*survivingNode, 20, "surviving iterator remains readable")
+		&& ExpectEqual(values.size(), 2, "size after head removal");
+}
+
+bool TestListCheckedEndOperations()
+{
+	KList values;
+	KList::Iterator iterator = values.end();
+	const KList &constantValues = values;
+	KList::ConstIterator constIterator = constantValues.end();
+	int caughtCount = 0;
+	try
+	{
+		*iterator;
+	}
+	catch (const std::out_of_range &)
+	{
+		++caughtCount;
+	}
+	try
+	{
+		++iterator;
+	}
+	catch (const std::out_of_range &)
+	{
+		++caughtCount;
+	}
+	try
+	{
+		*constIterator;
+	}
+	catch (const std::out_of_range &)
+	{
+		++caughtCount;
+	}
+	try
+	{
+		++constIterator;
+	}
+	catch (const std::out_of_range &)
+	{
+		++caughtCount;
+	}
+
+	return ExpectEqual(caughtCount, 4, "end dereference and increment are rejected")
+		&& Expect(values.empty(), "invalid operations do not change the list")
+		&& Expect(iterator == values.end(), "failed increment preserves mutable end")
+		&& Expect(constIterator == constantValues.end(), "failed increment preserves const end");
+}
+
+bool TestListManyNodesAndRemoval()
+{
+	KList values;
+	constexpr int elementCount = 10000;
+	for (int index = 0; index < elementCount; ++index)
+		values.push_front(index);
+
+	if (!ExpectEqual(values.size(), elementCount, "large list size"))
+		return false;
+	KList::Iterator iterator = values.begin();
+	for (int index = elementCount - 1; index >= 0; --index)
+	{
+		if (!Expect(iterator != values.end(), "large list contains the expected node")
+			|| !ExpectEqual(*iterator, index, "large list traversal order"))
+			return false;
+		++iterator;
+	}
+	if (!Expect(iterator == values.end(), "large list traversal terminates"))
+		return false;
+
+	for (int index = elementCount - 1; index >= 0; --index)
+	{
+		if (!ExpectEqual(*values.begin(), index, "head changes correctly during removal"))
+			return false;
+		values.pop_front();
+		if (!ExpectEqual(values.size(), index, "size decreases once per removal"))
+			return false;
+	}
+
+	return Expect(values.empty(), "all nodes removed")
+		&& Expect(values.begin() == values.end(), "empty range after large removal");
+}
+
+bool TestListIndependentInstancesAndLifetime()
+{
+	KList persistentValues;
+	persistentValues.push_front(99);
+	for (int round = 0; round < 100; ++round)
+	{
+		KList temporaryValues;
+		for (int index = 0; index < 100; ++index)
+			temporaryValues.push_front(round + index);
+		*temporaryValues.begin() = -1;
+		if (!ExpectEqual(*persistentValues.begin(), 99, "separate lists own separate nodes")
+			|| !ExpectEqual(temporaryValues.size(), 100, "temporary list size"))
+			return false;
+	}
+
+	return ExpectEqual(*persistentValues.begin(), 99, "other destructors preserve this list")
+		&& ExpectEqual(persistentValues.size(), 1, "persistent list size");
+}
+
 bool RunTest(const TestCase &testCase)
 {
 	std::cout << "[RUN ] " << testCase.m_name << '\n';
@@ -324,11 +612,25 @@ bool RunTest(const TestCase &testCase)
 	}
 }
 
+int RunSuite(const char *name, const TestCase *testCases, int testCount)
+{
+	std::cout << "=== " << name << " tests ===\n\n";
+	int passedCount = 0;
+	for (int index = 0; index < testCount; ++index)
+	{
+		if (RunTest(testCases[index]))
+			++passedCount;
+	}
+
+	std::cout << name << " summary: " << passedCount << '/' << testCount << " passed\n\n";
+	return testCount - passedCount;
+}
+
 } // namespace
 
 int main()
 {
-	const TestCase testCases[] = {
+	const TestCase vectorTests[] = {
 		{"KVector / initial state", TestInitialState},
 		{"KVector / insertion order and duplicate values", TestInsertionOrder},
 		{"KVector / capacity doubles", TestCapacityDoubling},
@@ -343,17 +645,27 @@ int main()
 		{"KVector / insert an existing element during growth", TestInsertFromOwnElement},
 		{"KVector / independent instances and repeated destruction", TestIndependentInstancesAndLifetime}
 	};
+	const TestCase listTests[] = {
+		{"KList / initial state", TestListInitialState},
+		{"KList / head insertion order and duplicate values", TestListHeadInsertion},
+		{"KList / head removal", TestListHeadRemoval},
+		{"KList / empty removal, single node and reuse", TestListEmptyRemovalAndReuse},
+		{"KList / writable traversal", TestListMutableTraversal},
+		{"KList / iterator increment and copies", TestListIteratorIncrementAndCopies},
+		{"KList / const traversal and iterator traits", TestListConstTraversal},
+		{"KList / insertion preserves existing iterators", TestListInsertionPreservesIterators},
+		{"KList / removal preserves surviving iterators", TestListRemovalPreservesSurvivingIterators},
+		{"KList / checked end operations", TestListCheckedEndOperations},
+		{"KList / many nodes, traversal and removal", TestListManyNodesAndRemoval},
+		{"KList / independent instances and repeated destruction", TestListIndependentInstancesAndLifetime}
+	};
 
-	std::cout << "=== KVector tests ===\n\n";
-	int passedCount = 0;
-	int totalCount = 0;
-	for (const TestCase &testCase : testCases)
-	{
-		++totalCount;
-		if (RunTest(testCase))
-			++passedCount;
-	}
-
-	std::cout << "Summary: " << passedCount << '/' << totalCount << " passed\n";
-	return passedCount == totalCount ? EXIT_SUCCESS : EXIT_FAILURE;
+	const int vectorTestCount = static_cast<int>(sizeof(vectorTests) / sizeof(vectorTests[0]));
+	const int listTestCount = static_cast<int>(sizeof(listTests) / sizeof(listTests[0]));
+	const int vectorFailures = RunSuite("KVector", vectorTests, vectorTestCount);
+	const int listFailures = RunSuite("KList", listTests, listTestCount);
+	const int totalCount = vectorTestCount + listTestCount;
+	const int failureCount = vectorFailures + listFailures;
+	std::cout << "Total: " << totalCount - failureCount << '/' << totalCount << " passed\n";
+	return failureCount == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

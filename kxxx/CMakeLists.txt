@@ -5,6 +5,8 @@ project(kxxx LANGUAGES CXX)
 add_executable(kxxx
 	kvector.h
 	kvector.cpp
+	klist.h
+	klist.cpp
 	main.cpp
 )
 
@@ -36,4 +38,5 @@ if(MINGW)
 endif()
 
 enable_testing()
-add_test(NAME kvector_core COMMAND kxxx)
+add_test(NAME kcontainers_core COMMAND kxxx)
+set_tests_properties(kcontainers_core PROPERTIES TIMEOUT 30)
