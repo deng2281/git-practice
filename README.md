@@ -1,38 +1,19 @@
-
 # Git 基础操作练习
 
-## 完成的操作
+本仓库用于完成第一周 Git 基础操作作业，记录从文件编辑、暂存和提交，到分支创建、切换、合并以及远程推送的完整过程。
 
-1. 使用 git status 查看仓库状态。
-2. 创建 Git 学习笔记，使用 git add 和 git commit 完成提交。
-3. 添加 .gitignore 忽略规则并提交。
-4. 创建并切换到 git-practice 分支。
-5. 在练习分支补充笔记并提交。
-6. 切回主分支，合并 git-practice 分支。
-7. 使用 git log --oneline 查看提交记录。
+## 文档入口
 
-## Commit message
+- [练习过程与作业总结](git-practice/README.md)：操作步骤、实际提交记录、分支合并说明、问题处理和学习收获。
+- [Git 学习笔记](git-practice/notes/git-practice.md)：工作区、暂存区、本地仓库、常用命令、忽略规则及远程认证知识。
+- [操作截图](git-practice/screenshots/)：练习过程中保存的终端操作记录。
+- [忽略规则](.gitignore)：位于仓库根目录，忽略依赖、构建产物、环境配置和日志。
 
-- docs: 添加 Git 练习笔记
-- chore: 添加 Git 忽略规则
-- docs: 补充 Git 分支学习笔记
-- docs: 记录 Git 练习过程和总结
+## 仓库说明
 
-## 分支创建和合并过程
+- 主分支：`master`。
+- 练习分支：`git-practice`。
+- GitHub 地址：<https://github.com/deng2281/git-practice>。
+- 作业相关文档与截图集中放在 `git-practice/` 下。
 
-使用 git switch -c git-practice 创建并切换到练习分支。
-补充笔记并提交后，切回主分支，
-使用 git merge git-practice 完成合并。
-
-## .gitignore 规则
-
-- node_modules/：忽略依赖目录。
-- dist/：忽略构建输出目录。
-- .env：忽略环境配置文件。
-- *.log：忽略日志文件。
-
-## 本次练习的收获
-
-理解了工作区、暂存区和本地仓库的区别，
-掌握了编辑、暂存、提交的基本流程，
-学会了创建、切换和合并分支。
+练习过程中保留了多次有明确含义的提交；完整操作说明见 [git-practice/README.md](git-practice/README.md)。
