@@ -1,7 +1,7 @@
 // File: main.cpp
 // Creator: Not specified.
 // Created: 2026-11-06
-// Description: Independent console tests for KVector and KList.
+// Description: Step-by-step examples showing container contents after each operation.
 // Copyright: Not specified.
 
 #include "kvector.h"
@@ -10,662 +10,237 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
-#include <limits>
 #include <stdexcept>
 
 namespace
 {
 
-typedef bool (*TestFunction)();
-
-struct TestCase
+void PrintVector(const char *operation, const KVector &values)
 {
-	TestCase(const char *testName, TestFunction testFunction);
-
-	const char *m_name;
-	TestFunction m_function;
-};
-
-TestCase::TestCase(const char *testName, TestFunction testFunction)
-	: m_name(testName)
-	, m_function(testFunction)
-{
-}
-
-bool Expect(bool condition, const char *message)
-{
-	if (!condition)
-		std::cout << "    Check failed: " << message << '\n';
-
-	return condition;
-}
-
-bool ExpectEqual(int actual, int expected, const char *message)
-{
-	if (actual != expected)
+	std::cout << "  " << operation << " -> [";
+	for (KVector::ConstIterator iterator = values.begin(); iterator != values.end(); ++iterator)
 	{
-		std::cout << "    Check failed: " << message
-			<< " (expected " << expected << ", got " << actual << ")\n";
-		return false;
+		if (iterator != values.begin())
+			std::cout << ", ";
+		std::cout << *iterator;
 	}
-
-	return true;
+	std::cout << "]  size=" << values.size()
+		<< "  capacity=" << values.capacity() << "  empty=" << values.empty() << '\n';
 }
 
-bool TestInitialState()
+void PrintList(const char *operation, const KList &values)
 {
-	KVector values;
-	const KVector &constantValues = values;
-	return Expect(values.empty(), "new vector is empty")
-		&& ExpectEqual(values.size(), 0, "initial size")
-		&& ExpectEqual(values.capacity(), 0, "initial capacity")
-		&& Expect(values.begin() == values.end(), "empty iterator range")
-		&& Expect(constantValues.begin() == constantValues.end(), "empty const range");
-}
-
-bool TestInsertionOrder()
-{
-	KVector values;
-	const int expectedValues[] = {10, -3, 0, 10};
-	for (int value : expectedValues)
-		values.push_back(value);
-
-	if (!ExpectEqual(values.size(), 4, "size after insertion")
-		|| !Expect(!values.empty(), "inserted vector is not empty"))
-		return false;
-
-	for (int index = 0; index < values.size(); ++index)
+	std::cout << "  " << operation << " -> [";
+	for (KList::ConstIterator iterator = values.begin(); iterator != values.end(); ++iterator)
 	{
-		if (!ExpectEqual(values.at(index), expectedValues[index], "insertion order"))
-			return false;
+		if (iterator != values.begin())
+			std::cout << ", ";
+		std::cout << *iterator;
 	}
-
-	return true;
+	std::cout << "]  size=" << values.size() << "  empty=" << values.empty() << '\n';
 }
 
-bool TestCapacityDoubling()
+// Returns one failed example or zero, allowing main to report a real exit status.
+int CheckResult(bool correct)
 {
-	KVector values;
-	const int expectedCapacities[] = {1, 2, 4, 4, 8, 8, 8, 8, 16};
-	for (int index = 0; index < 9; ++index)
-	{
-		values.push_back(index);
-		if (!ExpectEqual(values.capacity(), expectedCapacities[index], "doubling capacity")
-			|| !ExpectEqual(values.size(), index + 1, "size remains separate from capacity"))
-			return false;
-	}
-
-	return true;
+	std::cout << "  Check: " << (correct ? "PASS" : "FAIL") << "\n\n";
+	return correct ? 0 : 1;
 }
 
-bool TestRepeatedGrowthPreservesValues()
+int DemoVector()
 {
+	std::cout << "========== KVector ==========\n\n";
 	KVector values;
-	constexpr int elementCount = 10000;
-	for (int index = 0; index < elementCount; ++index)
-		values.push_back(index * 3 - 11);
+	int failedCount = 0;
 
-	if (!ExpectEqual(values.size(), elementCount, "size after repeated growth"))
-		return false;
+	std::cout << "1. Insert 1, 2, 3 at the back\n";
+	PrintVector("initial", values);
+	const bool initiallyEmpty = values.empty() && values.size() == 0
+		&& values.capacity() == 0 && values.begin() == values.end();
+	values.push_back(1);
+	PrintVector("push_back(1)", values);
+	const bool firstCapacityCorrect = values.capacity() == 1;
+	values.push_back(2);
+	PrintVector("push_back(2)", values);
+	const bool secondCapacityCorrect = values.capacity() == 2;
+	values.push_back(3);
+	PrintVector("push_back(3)", values);
+	std::cout << "  Expected: [1, 2, 3]; capacity grows 0 -> 1 -> 2 -> 4\n";
+	failedCount += CheckResult(initiallyEmpty && firstCapacityCorrect && secondCapacityCorrect
+		&& !values.empty() && values.size() == 3 && values.capacity() == 4
+		&& values.at(0) == 1 && values.at(1) == 2 && values.at(2) == 3);
 
-	for (int index = 0; index < elementCount; ++index)
-	{
-		if (!ExpectEqual(values.at(index), index * 3 - 11, "values survive reallocation"))
-			return false;
-	}
+	std::cout << "2. Read by index and random-access iterator\n";
+	const int indexedValue = values.at(1);
+	const int iteratorValue = *(values.begin() + 2);
+	const auto distance = values.end() - values.begin();
+	std::cout << "  at(1) = " << indexedValue << '\n'
+		<< "  *(begin() + 2) = " << iteratorValue << '\n'
+		<< "  end() - begin() = " << distance << '\n'
+		<< "  Expected: 2, 3, 3\n";
+	failedCount += CheckResult(indexedValue == 2 && iteratorValue == 3 && distance == 3);
 
-	return true;
-}
+	std::cout << "3. Change the second element\n";
+	PrintVector("before", values);
+	values.at(1) = 20;
+	PrintVector("at(1) = 20", values);
+	std::cout << "  Expected: [1, 20, 3]\n";
+	failedCount += CheckResult(values.size() == 3
+		&& values.at(0) == 1 && values.at(1) == 20 && values.at(2) == 3);
 
-bool TestMutableAccess()
-{
-	KVector values;
-	values.push_back(10);
-	values.push_back(20);
-	values.at(1) = 42;
-	*values.begin() = -7;
+	std::cout << "4. Remove the last element\n";
+	values.pop_back();
+	PrintVector("pop_back()", values);
+	std::cout << "  Expected: [1, 20]; size=2, capacity stays 4\n";
+	failedCount += CheckResult(values.size() == 2 && values.capacity() == 4
+		&& values.at(0) == 1 && values.at(1) == 20);
 
-	return ExpectEqual(values.at(0), -7, "write through iterator")
-		&& ExpectEqual(values.at(1), 42, "write through at");
-}
+	std::cout << "5. Remove all elements, then remove from an empty vector\n";
+	values.pop_back();
+	PrintVector("pop_back()", values);
+	values.pop_back();
+	PrintVector("pop_back()", values);
+	values.pop_back();
+	PrintVector("pop_back() on empty vector", values);
+	std::cout << "  Expected: []; size=0, empty=true, capacity stays 4\n";
+	failedCount += CheckResult(values.empty() && values.size() == 0
+		&& values.capacity() == 4 && values.begin() == values.end());
 
-bool TestRandomAccessIterators()
-{
-	KVector values;
-	for (int value = 10; value <= 50; value += 10)
-		values.push_back(value);
-
-	KVector::Iterator iterator = values.begin();
-	if (!ExpectEqual(*(iterator++), 10, "post-increment")
-		|| !ExpectEqual(*iterator, 20, "position after increment"))
-		return false;
-
-	iterator += 2;
-	if (!ExpectEqual(*iterator, 40, "iterator offset")
-		|| !ExpectEqual(iterator[-1], 30, "iterator indexing"))
-		return false;
-
-	--iterator;
-	iterator -= 2;
-	return Expect(iterator == values.begin(), "backward movement")
-		&& Expect(values.begin() < values.end(), "iterator ordering")
-		&& Expect(values.end() - values.begin() == values.size(), "iterator distance")
-		&& ExpectEqual(*(values.end() - 1), 50, "last element");
-}
-
-bool TestConstTraversal()
-{
-	KVector values;
-	values.push_back(-5);
-	values.push_back(0);
-	values.push_back(8);
-	const KVector &constantValues = values;
-
-	int total = 0;
-	int visitedCount = 0;
-	for (KVector::ConstIterator iterator = constantValues.begin(); iterator != constantValues.end(); ++iterator)
-	{
-		total += *iterator;
-		++visitedCount;
-	}
-
-	return ExpectEqual(total, 3, "sum through const iterators")
-		&& ExpectEqual(visitedCount, 3, "const traversal count")
-		&& ExpectEqual(constantValues.at(2), 8, "const at");
-}
-
-bool TestMutableBounds()
-{
-	KVector values;
-	const int invalidIndices[] = {-1, 0, std::numeric_limits<int>::max()};
+	std::cout << "6. Check invalid indices on the empty vector\n";
+	const int invalidIndices[] = {-1, 0};
+	int caughtCount = 0;
 	for (int index : invalidIndices)
 	{
+		std::cout << "  at(" << index << ") -> ";
 		try
 		{
 			values.at(index);
-			return Expect(false, "empty mutable at must throw");
+			std::cout << "no exception\n";
 		}
-		catch (const std::out_of_range &)
+		catch (const std::out_of_range &error)
 		{
-			// The expected exception is the result being tested.
+			std::cout << "out_of_range: " << error.what() << '\n';
+			++caughtCount;
 		}
 	}
+	std::cout << "  Expected: both accesses throw; vector remains empty\n";
+	failedCount += CheckResult(caughtCount == 2 && values.empty() && values.size() == 0);
 
-	values.push_back(17);
-	try
-	{
-		values.at(values.size());
-		return Expect(false, "index equal to size must throw");
-	}
-	catch (const std::out_of_range &)
-	{
-		return ExpectEqual(values.at(0), 17, "invalid access preserves values");
-	}
+	std::cout << "7. Insert again after removing all elements\n";
+	values.push_back(7);
+	values.push_back(8);
+	values.push_back(9);
+	PrintVector("push_back(7), push_back(8), push_back(9)", values);
+	std::cout << "  Expected: [7, 8, 9]; reuse capacity 4\n";
+	failedCount += CheckResult(values.size() == 3 && values.capacity() == 4
+		&& values.at(0) == 7 && values.at(1) == 8 && values.at(2) == 9);
+
+	return failedCount;
 }
 
-bool TestConstBounds()
+int DemoList()
 {
-	KVector values;
-	values.push_back(23);
-	const KVector &constantValues = values;
-	const int invalidIndices[] = {-1, 1, std::numeric_limits<int>::max()};
-	for (int index : invalidIndices)
-	{
-		try
-		{
-			constantValues.at(index);
-			return Expect(false, "invalid const at must throw");
-		}
-		catch (const std::out_of_range &)
-		{
-			// No other exception type is accepted by this test.
-		}
-	}
-
-	return ExpectEqual(constantValues.size(), 1, "const bounds checks preserve size")
-		&& ExpectEqual(constantValues.at(0), 23, "const bounds checks preserve data");
-}
-
-bool TestRemovalAndEmptyRemoval()
-{
-	KVector values;
-	values.pop_back();
-	if (!Expect(values.empty(), "removal from an initially empty vector")
-		|| !ExpectEqual(values.capacity(), 0, "empty removal does not allocate"))
-		return false;
-
-	values.push_back(10);
-	values.push_back(20);
-	const int savedCapacity = values.capacity();
-	KVector::Iterator first = values.begin();
-	values.pop_back();
-	if (!ExpectEqual(values.size(), 1, "size after removing the last value")
-		|| !ExpectEqual(values.at(0), 10, "first value remains")
-		|| !Expect(values.begin() == first, "pop does not reallocate"))
-		return false;
-
-	values.pop_back();
-	values.pop_back();
-	return Expect(values.empty(), "vector becomes empty")
-		&& ExpectEqual(values.size(), 0, "repeated empty removal keeps size zero")
-		&& ExpectEqual(values.capacity(), savedCapacity, "removal retains capacity")
-		&& Expect(values.begin() == values.end(), "emptied iterator range");
-}
-
-bool TestRefillWithoutGrowth()
-{
-	KVector values;
-	for (int index = 0; index < 5; ++index)
-		values.push_back(index);
-
-	const int savedCapacity = values.capacity();
-	KVector::Iterator savedBuffer = values.begin();
-	while (!values.empty())
-		values.pop_back();
-
-	for (int index = 0; index < 5; ++index)
-		values.push_back(100 + index);
-
-	if (!ExpectEqual(values.capacity(), savedCapacity, "refill reuses capacity")
-		|| !Expect(values.begin() == savedBuffer, "refill reuses the buffer"))
-		return false;
-
-	for (int index = 0; index < 5; ++index)
-	{
-		if (!ExpectEqual(values.at(index), 100 + index, "refilled value"))
-			return false;
-	}
-
-	return true;
-}
-
-bool TestInsertFromOwnElement()
-{
-	KVector values;
-	values.push_back(123);
-	// This insertion grows the buffer while the argument comes from that buffer.
-	values.push_back(values.at(0));
-	return ExpectEqual(values.size(), 2, "size after insertion from own element")
-		&& ExpectEqual(values.at(0), 123, "original value survives")
-		&& ExpectEqual(values.at(1), 123, "argument is captured before reallocation");
-}
-
-bool TestIndependentInstancesAndLifetime()
-{
-	KVector persistentValues;
-	persistentValues.push_back(99);
-	for (int round = 0; round < 100; ++round)
-	{
-		KVector temporaryValues;
-		for (int index = 0; index < 100; ++index)
-			temporaryValues.push_back(round + index);
-
-		temporaryValues.at(0) = -1;
-		if (!ExpectEqual(persistentValues.at(0), 99, "separate instances own separate storage")
-			|| !ExpectEqual(temporaryValues.at(99), round + 99, "temporary instance contents"))
-			return false;
-	}
-
-	return ExpectEqual(persistentValues.size(), 1, "other destructors do not change persistent instance");
-}
-
-bool ExpectListSequence(const KList &values, const int *expectedValues, int expectedCount)
-{
-	if (!ExpectEqual(values.size(), expectedCount, "list size matches expected sequence"))
-		return false;
-
-	KList::ConstIterator iterator = values.begin();
-	for (int index = 0; index < expectedCount; ++index)
-	{
-		if (!Expect(iterator != values.end(), "list has the expected node")
-			|| !ExpectEqual(*iterator, expectedValues[index], "list element order"))
-			return false;
-		++iterator;
-	}
-
-	return Expect(iterator == values.end(), "list has no extra nodes");
-}
-
-bool TestListInitialState()
-{
+	std::cout << "========== KList ==========\n\n";
 	KList values;
-	const KList &constantValues = values;
-	const KList::Iterator defaultIterator;
-	const KList::ConstIterator defaultConstIterator;
-	return Expect(values.empty(), "new list is empty")
-		&& ExpectEqual(values.size(), 0, "initial list size")
-		&& Expect(values.begin() == values.end(), "empty list iterator range")
-		&& Expect(constantValues.begin() == constantValues.end(), "empty list const range")
-		&& Expect(defaultIterator == values.end(), "default iterator is null")
-		&& Expect(defaultConstIterator == constantValues.end(), "default const iterator is null");
-}
+	int failedCount = 0;
 
-bool TestListHeadInsertion()
-{
-	KList values;
-	const int insertedValues[] = {10, -3, 0, 10};
-	for (int value : insertedValues)
-		values.push_front(value);
-
-	const int expectedValues[] = {10, 0, -3, 10};
-	return Expect(!values.empty(), "inserted list is not empty")
-		&& ExpectListSequence(values, expectedValues, 4);
-}
-
-bool TestListHeadRemoval()
-{
-	KList values;
-	values.push_front(10);
-	values.push_front(20);
-	values.push_front(30);
-	values.pop_front();
-	const int remainingValues[] = {20, 10};
-	if (!ExpectListSequence(values, remainingValues, 2))
-		return false;
-
-	values.pop_front();
-	const int lastValue[] = {10};
-	return ExpectListSequence(values, lastValue, 1);
-}
-
-bool TestListEmptyRemovalAndReuse()
-{
-	KList values;
-	values.pop_front();
-	values.pop_front();
-	if (!Expect(values.empty(), "empty removal has no effect")
-		|| !ExpectEqual(values.size(), 0, "empty removal keeps size zero"))
-		return false;
-
-	values.push_front(42);
-	if (!ExpectEqual(*values.begin(), 42, "single inserted node"))
-		return false;
-	values.pop_front();
-	if (!Expect(values.begin() == values.end(), "single node removed completely"))
-		return false;
-
-	values.pop_front();
-	values.push_front(-8);
-	const int expectedValues[] = {-8};
-	return ExpectListSequence(values, expectedValues, 1);
-}
-
-bool TestListMutableTraversal()
-{
-	KList values;
+	std::cout << "1. Insert 1, 2, 3 at the front\n";
+	PrintList("initial", values);
+	const bool initiallyEmpty = values.empty() && values.size() == 0 && values.begin() == values.end();
 	values.push_front(1);
+	PrintList("push_front(1)", values);
 	values.push_front(2);
+	PrintList("push_front(2)", values);
 	values.push_front(3);
-	for (int &value : values)
-		value *= 10;
-
+	PrintList("push_front(3)", values);
+	std::cout << "  Expected: [3, 2, 1]; each insertion becomes the new head\n";
 	KList::Iterator iterator = values.begin();
-	*iterator = 99;
-	const int expectedValues[] = {99, 20, 10};
-	return Expect(iterator.operator->() == &(*iterator), "arrow exposes the same element")
-		&& ExpectListSequence(values, expectedValues, 3);
-}
+	const bool insertionOrderCorrect = *iterator++ == 3 && *iterator++ == 2
+		&& *iterator++ == 1 && iterator == values.end();
+	failedCount += CheckResult(initiallyEmpty && !values.empty()
+		&& values.size() == 3 && insertionOrderCorrect);
 
-bool TestListIteratorIncrementAndCopies()
-{
-	KList values;
-	values.push_front(10);
-	values.push_front(20);
-	values.push_front(30);
-	KList::Iterator iterator = values.begin();
-	KList::Iterator copy = iterator;
-	KList::Iterator previous = iterator++;
-	if (!Expect(previous == copy, "post-increment returns the old position")
-		|| !ExpectEqual(*previous, 30, "old position remains readable")
-		|| !ExpectEqual(*iterator, 20, "post-increment advances once")
-		|| !Expect(iterator != copy, "advancing a copy does not advance the original"))
-		return false;
-
-	KList::Iterator &advanced = ++iterator;
-	if (!Expect(&advanced == &iterator, "prefix increment returns this iterator")
-		|| !ExpectEqual(*iterator, 10, "prefix increment advances once"))
-		return false;
-
+	std::cout << "2. Move the iterator forward\n";
+	iterator = values.begin();
+	const int firstValue = *iterator;
+	const int secondValue = *(++iterator);
+	const int thirdValue = *(++iterator);
 	++iterator;
-	return Expect(iterator == values.end(), "increment from last node reaches end")
-		&& ExpectEqual(*copy, 30, "copied iterator has an independent position");
-}
+	std::cout << "  *begin() = " << firstValue << '\n'
+		<< "  advance once = " << secondValue << '\n'
+		<< "  advance twice = " << thirdValue << '\n'
+		<< "  advance again reaches end(): " << (iterator == values.end()) << '\n'
+		<< "  Expected: 3 -> 2 -> 1 -> end\n";
+	failedCount += CheckResult(firstValue == 3 && secondValue == 2
+		&& thirdValue == 1 && iterator == values.end());
 
-bool TestListConstTraversal()
-{
-	KList values;
-	values.push_front(1);
-	values.push_front(2);
-	values.push_front(3);
-	const KList &constantValues = values;
-	KList::ConstIterator iterator = constantValues.begin();
-	KList::ConstIterator previous = iterator++;
-	if (!ExpectEqual(*previous, 3, "const postfix increment returns old value")
-		|| !ExpectEqual(*iterator, 2, "const iterator advances")
-		|| !Expect(iterator.operator->() == &(*iterator), "const arrow points at the element"))
-		return false;
+	std::cout << "3. Change the head value through the iterator\n";
+	PrintList("before", values);
+	*values.begin() = 30;
+	PrintList("*begin() = 30", values);
+	std::cout << "  Expected: [30, 2, 1]; node count stays 3\n";
+	failedCount += CheckResult(*values.begin() == 30 && values.size() == 3);
 
-	KList::ConstIterator converted = values.begin();
-	if (!Expect(converted == constantValues.begin(), "mutable iterator converts to const iterator")
-		|| !Expect(converted != iterator, "const iterator comparison"))
-		return false;
-
-	int total = 0;
-	int visitedCount = 0;
-	for (int value : constantValues)
-	{
-		total += value;
-		++visitedCount;
-	}
-
-	return ExpectEqual(total, 6, "const traversal sum")
-		&& ExpectEqual(visitedCount, 3, "const traversal count")
-		&& Expect(std::distance(constantValues.begin(), constantValues.end()) == 3,
-			"iterator traits support a standard traversal algorithm");
-}
-
-bool TestListInsertionPreservesIterators()
-{
-	KList values;
-	values.push_front(10);
-	KList::Iterator existingNode = values.begin();
-	int *existingValue = &(*existingNode);
-	values.push_front(20);
-	KList::Iterator nextNode = values.begin();
-	++nextNode;
-
-	return ExpectEqual(*existingNode, 10, "head insertion preserves existing node")
-		&& Expect(&(*existingNode) == existingValue, "head insertion preserves node address")
-		&& Expect(nextNode == existingNode, "new head links to the previous head")
-		&& ExpectEqual(values.size(), 2, "size after inserting a new head");
-}
-
-bool TestListRemovalPreservesSurvivingIterators()
-{
-	KList values;
-	values.push_front(10);
-	values.push_front(20);
-	values.push_front(30);
-	KList::Iterator survivingNode = values.begin();
-	++survivingNode;
-	int *survivingValue = &(*survivingNode);
+	std::cout << "4. Remove the head node\n";
 	values.pop_front();
+	PrintList("pop_front()", values);
+	std::cout << "  Expected: [2, 1]\n";
+	iterator = values.begin();
+	const bool removalOrderCorrect = *iterator++ == 2 && *iterator++ == 1 && iterator == values.end();
+	failedCount += CheckResult(values.size() == 2 && removalOrderCorrect);
 
-	// The erased head's iterator must not be dereferenced.
-	return Expect(values.begin() == survivingNode, "surviving node becomes the new head")
-		&& Expect(&(*survivingNode) == survivingValue, "surviving node address is unchanged")
-		&& ExpectEqual(*survivingNode, 20, "surviving iterator remains readable")
-		&& ExpectEqual(values.size(), 2, "size after head removal");
-}
+	std::cout << "5. Remove all nodes, then remove from an empty list\n";
+	values.pop_front();
+	PrintList("pop_front()", values);
+	values.pop_front();
+	PrintList("pop_front()", values);
+	values.pop_front();
+	PrintList("pop_front() on empty list", values);
+	std::cout << "  Expected: []; size=0, empty=true\n";
+	failedCount += CheckResult(values.empty() && values.size() == 0 && values.begin() == values.end());
 
-bool TestListCheckedEndOperations()
-{
-	KList values;
-	KList::Iterator iterator = values.end();
-	const KList &constantValues = values;
-	KList::ConstIterator constIterator = constantValues.end();
-	int caughtCount = 0;
-	try
-	{
-		*iterator;
-	}
-	catch (const std::out_of_range &)
-	{
-		++caughtCount;
-	}
-	try
-	{
-		++iterator;
-	}
-	catch (const std::out_of_range &)
-	{
-		++caughtCount;
-	}
-	try
-	{
-		*constIterator;
-	}
-	catch (const std::out_of_range &)
-	{
-		++caughtCount;
-	}
-	try
-	{
-		++constIterator;
-	}
-	catch (const std::out_of_range &)
-	{
-		++caughtCount;
-	}
+	std::cout << "6. Insert again after removing all nodes\n";
+	values.push_front(9);
+	PrintList("push_front(9)", values);
+	std::cout << "  Expected: [9]; size=1\n";
+	failedCount += CheckResult(!values.empty() && values.size() == 1 && *values.begin() == 9);
 
-	return ExpectEqual(caughtCount, 4, "end dereference and increment are rejected")
-		&& Expect(values.empty(), "invalid operations do not change the list")
-		&& Expect(iterator == values.end(), "failed increment preserves mutable end")
-		&& Expect(constIterator == constantValues.end(), "failed increment preserves const end");
-}
+	std::cout << "7. Existing node iterator survives insertion and removal of a new head\n";
+	KList::Iterator savedIterator = values.begin();
+	values.push_front(8);
+	PrintList("push_front(8)", values);
+	const int savedValueAfterInsertion = *savedIterator;
+	std::cout << "  saved iterator still reads " << savedValueAfterInsertion << '\n';
+	values.pop_front();
+	PrintList("pop_front()", values);
+	std::cout << "  saved iterator still reads " << *savedIterator << '\n'
+		<< "  Expected: [8, 9] -> [9]; saved iterator always reads 9\n";
+	failedCount += CheckResult(savedValueAfterInsertion == 9
+		&& *savedIterator == 9 && values.begin() == savedIterator && values.size() == 1);
 
-bool TestListManyNodesAndRemoval()
-{
-	KList values;
-	constexpr int elementCount = 10000;
-	for (int index = 0; index < elementCount; ++index)
-		values.push_front(index);
-
-	if (!ExpectEqual(values.size(), elementCount, "large list size"))
-		return false;
-	KList::Iterator iterator = values.begin();
-	for (int index = elementCount - 1; index >= 0; --index)
-	{
-		if (!Expect(iterator != values.end(), "large list contains the expected node")
-			|| !ExpectEqual(*iterator, index, "large list traversal order"))
-			return false;
-		++iterator;
-	}
-	if (!Expect(iterator == values.end(), "large list traversal terminates"))
-		return false;
-
-	for (int index = elementCount - 1; index >= 0; --index)
-	{
-		if (!ExpectEqual(*values.begin(), index, "head changes correctly during removal"))
-			return false;
-		values.pop_front();
-		if (!ExpectEqual(values.size(), index, "size decreases once per removal"))
-			return false;
-	}
-
-	return Expect(values.empty(), "all nodes removed")
-		&& Expect(values.begin() == values.end(), "empty range after large removal");
-}
-
-bool TestListIndependentInstancesAndLifetime()
-{
-	KList persistentValues;
-	persistentValues.push_front(99);
-	for (int round = 0; round < 100; ++round)
-	{
-		KList temporaryValues;
-		for (int index = 0; index < 100; ++index)
-			temporaryValues.push_front(round + index);
-		*temporaryValues.begin() = -1;
-		if (!ExpectEqual(*persistentValues.begin(), 99, "separate lists own separate nodes")
-			|| !ExpectEqual(temporaryValues.size(), 100, "temporary list size"))
-			return false;
-	}
-
-	return ExpectEqual(*persistentValues.begin(), 99, "other destructors preserve this list")
-		&& ExpectEqual(persistentValues.size(), 1, "persistent list size");
-}
-
-bool RunTest(const TestCase &testCase)
-{
-	std::cout << "[RUN ] " << testCase.m_name << '\n';
-	try
-	{
-		const bool passed = testCase.m_function();
-		std::cout << (passed ? "[PASS] " : "[FAIL] ") << testCase.m_name << "\n\n";
-		return passed;
-	}
-	catch (const std::exception &error)
-	{
-		std::cout << "[FAIL] " << testCase.m_name << ": " << error.what() << "\n\n";
-		return false;
-	}
-}
-
-int RunSuite(const char *name, const TestCase *testCases, int testCount)
-{
-	std::cout << "=== " << name << " tests ===\n\n";
-	int passedCount = 0;
-	for (int index = 0; index < testCount; ++index)
-	{
-		if (RunTest(testCases[index]))
-			++passedCount;
-	}
-
-	std::cout << name << " summary: " << passedCount << '/' << testCount << " passed\n\n";
-	return testCount - passedCount;
+	return failedCount;
 }
 
 } // namespace
 
 int main()
 {
-	const TestCase vectorTests[] = {
-		{"KVector / initial state", TestInitialState},
-		{"KVector / insertion order and duplicate values", TestInsertionOrder},
-		{"KVector / capacity doubles", TestCapacityDoubling},
-		{"KVector / values survive repeated growth", TestRepeatedGrowthPreservesValues},
-		{"KVector / writable element access", TestMutableAccess},
-		{"KVector / random-access iterators", TestRandomAccessIterators},
-		{"KVector / const traversal", TestConstTraversal},
-		{"KVector / mutable access bounds", TestMutableBounds},
-		{"KVector / const access bounds", TestConstBounds},
-		{"KVector / removal and empty removal", TestRemovalAndEmptyRemoval},
-		{"KVector / refill retained storage", TestRefillWithoutGrowth},
-		{"KVector / insert an existing element during growth", TestInsertFromOwnElement},
-		{"KVector / independent instances and repeated destruction", TestIndependentInstancesAndLifetime}
-	};
-	const TestCase listTests[] = {
-		{"KList / initial state", TestListInitialState},
-		{"KList / head insertion order and duplicate values", TestListHeadInsertion},
-		{"KList / head removal", TestListHeadRemoval},
-		{"KList / empty removal, single node and reuse", TestListEmptyRemovalAndReuse},
-		{"KList / writable traversal", TestListMutableTraversal},
-		{"KList / iterator increment and copies", TestListIteratorIncrementAndCopies},
-		{"KList / const traversal and iterator traits", TestListConstTraversal},
-		{"KList / insertion preserves existing iterators", TestListInsertionPreservesIterators},
-		{"KList / removal preserves surviving iterators", TestListRemovalPreservesSurvivingIterators},
-		{"KList / checked end operations", TestListCheckedEndOperations},
-		{"KList / many nodes, traversal and removal", TestListManyNodesAndRemoval},
-		{"KList / independent instances and repeated destruction", TestListIndependentInstancesAndLifetime}
-	};
-
-	const int vectorTestCount = static_cast<int>(sizeof(vectorTests) / sizeof(vectorTests[0]));
-	const int listTestCount = static_cast<int>(sizeof(listTests) / sizeof(listTests[0]));
-	const int vectorFailures = RunSuite("KVector", vectorTests, vectorTestCount);
-	const int listFailures = RunSuite("KList", listTests, listTestCount);
-	const int totalCount = vectorTestCount + listTestCount;
-	const int failureCount = vectorFailures + listFailures;
-	std::cout << "Total: " << totalCount - failureCount << '/' << totalCount << " passed\n";
-	return failureCount == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+	std::cout << std::boolalpha;
+	try
+	{
+		const int vectorFailures = DemoVector();
+		const int listFailures = DemoList();
+		const int failureCount = vectorFailures + listFailures;
+		std::cout << "========== Result ==========\n";
+		if (failureCount == 0)
+			std::cout << "All 14 examples passed.\n";
+		else
+			std::cout << failureCount << " example(s) failed.\n";
+		return failureCount == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+	}
+	catch (const std::exception &error)
+	{
+		std::cout << "Unexpected error: " << error.what() << '\n';
+		return EXIT_FAILURE;
+	}
 }
