@@ -1,0 +1,2 @@
+add_executable(simpleson_task01 main.cpp)
+target_link_libraries(simpleson_task01 PRIVATE simpleson)
